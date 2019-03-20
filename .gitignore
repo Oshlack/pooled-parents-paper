@@ -4,3 +4,5 @@
 .Ruserdata
 *.Rproj
 data/
+plots/
+*DS_Store
