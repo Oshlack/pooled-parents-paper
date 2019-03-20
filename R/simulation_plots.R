@@ -7,10 +7,10 @@ library("data.table")
 library("mcriPalettes")
 my.colours = c(1,4,5)
 
-source('pooled_paper_functions.R')
+source('R/pooled_paper_functions.R')
 
 
-plot_prefix = 'compare_callers.'
+plot_prefix = 'plots/compare_callers.'
 variantcaller_order = c("gatk individual", "gatk joint", "freebayes highqual")
 sim_type_order = c("constant depth", "additive depth")
 
@@ -46,7 +46,7 @@ poolstats_ind_prop_probands_fp$sim_type = 'additive depth'
 rm(all_data_ind_prop)
 
 ### GATK joint calling (unfiltered)
-data_dir = 'data/GT_filter/'
+data_dir = 'data/gatk_joint/'
 
 # Constant Depth
 replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint')#, 
@@ -78,7 +78,7 @@ rm(all_data_joint_prop)
 data_dir = 'data/freebayes/'
 
 ## Constant Depth freebayes
-replicates = c('random_pools_joint')#, 'random_pools2_joint', 'random_pools3_joint')
+replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint')
 # replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint',
 #                'random_pools4_joint', 'random_pools5_joint', 'random_pools6_joint')
 all_data_fb_const = extract_ind_csvs(data_dir, replicates,
@@ -143,47 +143,6 @@ poolstats$sim_type = factor(as.character(poolstats$sim_type), levels = sim_type_
 poolstats_alleles$sim_type = factor(as.character(poolstats_alleles$sim_type), levels = sim_type_order)
 poolstats_fp$sim_type = factor(as.character(poolstats_fp$sim_type), levels = sim_type_order)
 
-### Plots
-
-ggplot(data=poolstats_fp, aes(x=pool, y=percent_fp, colour = variantcaller, shape = sim_type)) +
-  stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller,
-                                          linetype = sim_type)) +
-  #geom_point(size=2) +
-  scale_y_continuous(limits = c(0, 39), breaks = seq(0, 100, by = 10)) +
-  labs(x="Number of samples in pool", y="False positives %") +
-  scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 20)
- ggsave(paste0(plot_prefix, 'false_pos_percent.jpg'))
- 
-
-# Plot recall as a percentage
-ggplot(data=poolstats, aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
-  stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller,
-                                          linetype = sim_type)) +
-  geom_point(size=2) +
-  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-  labs(x="Number of samples in pool", y="Recall %") +
-  ggtitle("All loci variant in any proband") + 
-  scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 18)
-ggsave(paste0(plot_prefix, 'recall_percent.jpg'))
-
-ggplot(data=poolstats_alleles[poolstats_alleles$nonref_allele_count_truth == 1,], 
-       aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
-  geom_point(size=2) + 
-  stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller,
-                                          linetype = sim_type)) + 
-  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-  labs(x="Number of samples in pool", y="Recall %") +
-  ggtitle("Alleles found in one proband") + 
-  scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 18)
-ggsave(paste0(plot_prefix, 'recall_percent_singles.jpg'))
-
-
 #Save objects
 # save(file = 'pool_sim_data.Robj',
 #      all_data_ind_const_probands, all_data_ind_prop_probands,
@@ -199,7 +158,40 @@ ggsave(paste0(plot_prefix, 'recall_percent_singles.jpg'))
 #for (thing in ls()) { message(thing); print(object.size(get(thing)), units='auto') }
 
 
-### Plots with subsets for talk
+### Plots functions with subsets
+
+# Plot recall as a percentage
+plot_recall = function(variantcallers, sim_types, label){
+  data_subset = subset(poolstats, variantcaller %in% variantcallers & sim_type %in% sim_types)
+  ggplot(data=data_subset, aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
+    stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
+                                            colour=variantcaller,
+                                            linetype = sim_type), size=1.5) +
+    geom_point(size=2.5) +
+    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
+    labs(x="Number of samples in pool", y="Recall %") +
+    scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
+    theme_classic(base_size = 18) +
+    theme(legend.position=c(0.2, 0.3), legend.background=element_blank())
+  ggsave(paste0(plot_prefix, label, 'recall_percent.jpg'), height=8, width=8)
+}
+
+plot_recall_single = function(variantcallers, sim_types, label){
+  data_subset = subset(poolstats_alleles, variantcaller %in% variantcallers & sim_type %in% sim_types 
+                       & nonref_allele_count_truth == 1)
+  ggplot(data=data_subset, 
+         aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
+    geom_point(size=2.5) + 
+    stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
+                                            colour=variantcaller,
+                                            linetype = sim_type), size=1.5) + 
+    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
+    labs(x="Number of samples in pool", y="Recall %") +
+    scale_color_manual(values = mcriPalette("symbol")[my.colours]) + 
+    theme_classic(base_size = 18) +
+    theme(legend.position='none')
+  ggsave(paste0(plot_prefix, label, 'recall_percent_singles.jpg'), height=8, width=8)
+}
 
 plot_fp = function(variantcallers, sim_types, label){
   data_subset = subset(poolstats_fp, variantcaller %in% variantcallers & sim_type %in% sim_types)
@@ -211,172 +203,61 @@ plot_fp = function(variantcallers, sim_types, label){
     labs(x="Number of samples in pool", y="False positives %") +
     scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
     theme_classic(base_size = 18) +
-    theme(legend.position=c(0.2, 0.7))
-  ggsave(paste0(plot_prefix, label, 'false_pos_percent.jpg'), width=8)
-}
-
-# Plot recall as a percentage
-plot_recall = function(variantcallers, sim_types, label){
-  data_subset = subset(poolstats, variantcaller %in% variantcallers & sim_type %in% sim_types)
-  ggplot(data=data_subset, aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
-    stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                            colour=variantcaller,
-                                            linetype = sim_type)) +
-    geom_point(size=2) +
-    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-    labs(x="Number of samples in pool", y="Recall %") +
-    scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-    theme_classic(base_size = 18) +
-    theme(legend.position=c(0.2, 0.3), legend.background=element_blank())
-  ggsave(paste0(plot_prefix, label, 'recall_percent.jpg'), width=8)
-}
-
-plot_recall_single = function(variantcallers, sim_types, label){
-  data_subset = subset(poolstats_alleles, variantcaller %in% variantcallers & sim_type %in% sim_types 
-                       & nonref_allele_count_truth == 1)
-  ggplot(data=data_subset, 
-         aes(x=pool, y=percent_recovered, colour = variantcaller, shape = sim_type)) + 
-    geom_point(size=2) + 
-    stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                            colour=variantcaller,
-                                            linetype = sim_type)) + 
-    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-    labs(x="Number of samples in pool", y="Recall %") +
-    scale_color_manual(values = mcriPalette("symbol")[my.colours]) + 
-    theme_classic(base_size = 18) +
-    theme(legend.position=c(0.2, 0.3), legend.background=element_blank())
-  ggsave(paste0(plot_prefix, label, 'recall_percent_singles.jpg'), width=8)
+    theme(legend.position='none')
+  ggsave(paste0(plot_prefix, label, 'false_pos_percent.jpg'), height=8, width=8)
 }
 
 
-#c("gatk individual", "gatk joint", "freebayes highqual")
-#c("constant depth", "additive depth")
-
-# Plots for talk:
-plot_fp(c("gatk individual", "gatk joint", "freebayes highqual"),
-        c("constant depth", "additive depth"),
-        label = 'all.')
-
-plot_recall(c("gatk individual"),
-            c("constant depth"),
-            label = 'const1.')
-plot_recall(c("gatk individual", "gatk joint"),
-            c("constant depth"),
-            label = 'const2.')
-plot_recall(c("gatk individual", "gatk joint", "freebayes highqual"),
-            c("constant depth"),
-            label = 'const3.')
-#
-plot_recall_single(c("gatk individual"),
-            c("constant depth"),
-            label = 'const_single1.')
-plot_recall_single(c("gatk individual", "gatk joint"),
-            c("constant depth"),
-            label = 'const_single2.')
-plot_recall_single(c("gatk individual", "gatk joint", "freebayes highqual"),
-            c("constant depth"),
-            label = 'const_single3.')
-#
-plot_recall(c("gatk individual", "gatk joint"),
-            c("constant depth"),
-            label = 'depths1.')
-plot_recall(c("gatk individual", "gatk joint"),
-            c("constant depth", "additive depth"),
-            label = 'depths2.')
-plot_recall_single(c("gatk individual", "gatk joint"),
-            c("constant depth"),
-            label = 'depths1.')
-plot_recall_single(c("gatk individual", "gatk joint"),
-            c("constant depth", "additive depth"),
-            label = 'depths2.')
-
-# Plots for paper:
+### Plots for paper:
 plot_recall(c("gatk individual", "gatk joint", "freebayes highqual"),
                    c("constant depth", "additive depth"),
                    label = 'all.')
 plot_recall_single(c("gatk individual", "gatk joint", "freebayes highqual"),
                    c("constant depth", "additive depth"),
                    label = 'all.')
-# ggplot(data=poolstats,
-#        aes(y=total, x=pool, colour=variantcaller, shape = sim_type)) +
-#   geom_point() +
-#   #stat_summary(fun.y=mean,geom="line",
-#   #             aes(group=interaction(sim_type,variantcaller), 
-#   #                 colour=variantcaller, linetype = sim_type)) +
-#   labs(x="Number of samples in pool", y="Total variants called") +
-#   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-#   theme_classic(base_size = 20) #+ theme(legend.position=c(0.25, 0.8))
-# ggsave(paste0(plot_prefix, 'total_variants.jpg'), width=8)
 
-#
-plot_fp(c("gatk individual", "gatk joint", "freebayes highqual"),
-        c("constant depth"),
-        label = 'const.')
 plot_fp(c("gatk individual", "gatk joint", "freebayes highqual"),
         c("constant depth", "additive depth"),
         label = 'all.')
 
-options(scipen=10000)
 ggplot(data=subset(poolstats, sim_type %in% 'constant depth'),
                    aes(y=total, x=pool, colour=variantcaller)) +
-  #geom_point(aes(colour = simulation)) +
-  stat_summary(fun.y=mean,geom="line",aes(group=variantcaller)) +
-  #facet_wrap(~variantcaller) +
-  #scale_y_continuous(breaks = seq(0, 10000000, by = 1000000)) +
-  labs(x="Number of samples in pool", y="Total variants called") +
-  # geom_label(data = subset(poolstats, pool == 10 & simulation == 1),
-  #            aes(label=variantcaller), hjust = 1) +
+  stat_summary(fun.y=mean,geom="line",aes(group=variantcaller), size=1.5) +
+  labs(x="Number of samples in pool", y="Mean variants called per pool") +
   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 20) + theme(legend.position=c(0.25, 0.8))
-ggsave(paste0(plot_prefix, 'total_variants.jpg'), width=8)
+  theme_classic(base_size = 20) + theme(legend.position='none')
+ggsave(paste0(plot_prefix, 'total_variants.jpg'), height=8, width=8)
 
 # Plot real data recall over simulations
 data_subset = subset(poolstats, sim_type == 'constant depth')
 ggplot(data=data_subset, aes(x=pool, y=percent_recovered, colour = variantcaller)) + 
   stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller)) +
-  geom_point(size=2) +
+                                          colour=variantcaller), size=1.5) +
+  geom_point(size=2.5) +
   geom_point(x=8, y=78, colour='black', size=10, shape='*') +
   annotate("text", x=8.5, y=78, label= "78%", size=5) +
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
   labs(x="Number of samples in pool", y="Recall %") +
   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
   theme_classic(base_size = 18) +
-  theme(legend.position=c(0.2, 0.2))
-ggsave('recall_constant_plus_real.jpg', width=8)
+  theme(legend.position='none')
+ggsave('plots/recall_constant_plus_real.jpg', height=8, width=8)
 
 data_subset = subset(poolstats_alleles, sim_type == 'constant depth' 
                      & nonref_allele_count_truth == 1)
 ggplot(data=data_subset, 
        aes(x=pool, y=percent_recovered, colour = variantcaller)) + 
-  geom_point(size=2) + 
+  geom_point(size=2.5) + 
   geom_point(x=8, y=72, colour='black', size=10, shape='*') +
   annotate("text", x=8.5, y=72, label= "72%", size=5) +
   stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller)) + 
+                                          colour=variantcaller), size=1.5) + 
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
   labs(x="Number of samples in pool", y="Recall %") +
   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
   theme_classic(base_size = 18) +
-  theme(legend.position=c(0.2, 0.2))
-ggsave('recall_singles_constant_plus_real.jpg', width=8)
-
-# Make a plot showing target depth for the simulation strategies
-mock_cov = data.frame(pool=c(seq(2,10,by=2),seq(2,10,by=2)), 
-                      sim_type=factor(c(rep('constant depth',5), rep('additive depth',5)), levels = sim_type_order)
-                                      )
-mock_cov$depth[1:5] = 200
-mock_cov$depth[6:10] = 100 * mock_cov$pool[6:10]
-ggplot(data=mock_cov, aes(x=pool, y=depth, 
-      colour=sim_type, linetype=sim_type, shape=sim_type)) +
-  geom_line() +
-  geom_point(size=3) +
-  labs(x="Number of samples in pool", y="Sequencing depth") +
-  scale_y_continuous(limits = c(0, 1000), breaks = seq(0,1000,by=200)) +
-  scale_color_manual(values = mcriPalette("symbol")[c(2,7)]) +
-  theme_classic(base_size = 20) +
-  theme(legend.position=c(0.2, 0.8))
-ggsave('Simulated_sequencing_depth.jpg', width=8)
+  theme(legend.position='none')
+ggsave('plots/recall_singles_constant_plus_real.jpg', height=8, width=8)
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
