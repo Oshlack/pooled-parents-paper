@@ -4,10 +4,15 @@ library("mcriPalettes")
 my.colours = c(1,4,5)
 
 # Either source to re-generate stats, or just load previous data
-source('R/simulation_stats.R') # Uses about 80GB memory!
+#source('R/simulation_stats.R') # Uses about 80GB memory!
 load('data/simulation_summary_data.Robj')
 
 plot_prefix = 'plots/compare_callers.'
+
+real_recall = 88.2
+real_recall_singleton = 91.1
+#real_recall = 78
+#real_recall_singleton = 72
 
 ### Plots functions with subsets
 
@@ -85,13 +90,13 @@ ggplot(data=data_subset, aes(x=pool, y=percent_recovered, colour = variantcaller
   stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
                                           colour=variantcaller), size=1.5) +
   geom_point(size=2.5) +
-  geom_point(x=8, y=78, colour='black', size=10, shape='*') +
-  annotate("text", x=8.5, y=78, label= "78%", size=5) +
+  geom_point(x=8, y=real_recall, colour='black', size=10, shape='*') +
+  annotate("text", x=8.5, y=real_recall, label=paste0(real_recall,"%"), size=5) +
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
   labs(x="Number of samples in pool", y="Recall %") +
   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
   theme_classic(base_size = 18) +
-  theme(legend.position='none')
+  theme(legend.position=c(0.2, 0.15), legend.background=element_blank())
 ggsave('plots/recall_constant_plus_real.jpg', height=8, width=8)
 
 data_subset = subset(poolstats_alleles, sim_type == 'constant depth' 
@@ -99,8 +104,8 @@ data_subset = subset(poolstats_alleles, sim_type == 'constant depth'
 ggplot(data=data_subset, 
        aes(x=pool, y=percent_recovered, colour = variantcaller)) + 
   geom_point(size=2.5) + 
-  geom_point(x=8, y=72, colour='black', size=10, shape='*') +
-  annotate("text", x=8.5, y=72, label= "72%", size=5) +
+  geom_point(x=8, y=real_recall_singleton, colour='black', size=10, shape='*') +
+  annotate("text", x=8.5, y=real_recall_singleton, label=paste0(real_recall_singleton,"%"), size=5) +
   stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
                                           colour=variantcaller), size=1.5) + 
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +

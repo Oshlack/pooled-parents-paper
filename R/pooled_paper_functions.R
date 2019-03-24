@@ -161,3 +161,53 @@ extract_ind_csvs = function(data_dir, replicates, sim_type) {
   
   return(all_data)
 }
+
+get_vep_header = function(vep_tsv_file) {
+  all_lines = readLines(vep_tsv_file)
+  header_row = all_lines[grep("#Uploaded_variation", all_lines)]
+  header_vect = strsplit(header_row, split='\t')[[1]]
+  header_vect = sub('#', '', header_vect)
+  return(header_vect)
+}
+
+convert_location = function(l) {
+  l_split = strsplit(l, ':')
+  chrom = l_split[[1]][1]
+  pos = as.integer(l_split[[1]][2])
+  pos_string = formatC(pos, width = 9, format = "d", flag = "0")
+  return(paste0(chrom,'_',pos_string))
+}
+
+variant_to_location = function(variant) {
+  v_split = strsplit(variant, '_')
+  return(paste0(v_split[[1]][1:2], collapse = '_'))
+}
+
+# Extract vep tsv annotations from multiple individuals
+extract_vep_tsvs = function(data_dir) {
+  files = list.files(path = data_dir, pattern = ".*vep.tsv$")
+  all_data_list = list()
+  for(i in 1:length(files)) {
+    sample_id = strsplit(files[i], '.', fixed=T)[[1]][1]
+    this_file = paste0(data_dir,files[i])
+    data = read.table(this_file, stringsAsFactors = F, comment.char = "#", 
+                      col.names=get_vep_header(this_file), na.strings = "-")
+    data$proband = sample_id
+    all_data_list[[(length(all_data_list) +1)]] = data
+  }
+  all_data = bind_rows(all_data_list)
+  all_data$location_str = sapply(all_data$Location, convert_location)
+  return(all_data)
+}
+
+# simplify consequences by taking first if multiple and removing "_variant"
+simplify_consequence = function(consequence) {
+  first = strsplit(consequence, ',', fixed=T)[[1]][1]
+  simplified = sub('_variant', '', first)
+  return(simplified)
+}
+
+# Set order of factor by frequency
+factor_by_freq = function(vect, decreasing=T) {
+  factor(vect, levels=names(sort(table(vect), decreasing=decreasing)))
+}
