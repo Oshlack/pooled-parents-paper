@@ -14,6 +14,21 @@ def variant_id(record):
     POSstr = '{0:09d}'.format(record.POS) # add leading 0s
     return '_'.join([str(x) for x in [record.CHROM, POSstr, record.REF, ALTstr]])
 
+def variant_id_split(record):
+    """Create a unique ID for each variant so they can be compared
+    If multiple variant alleles, split them up.
+    Args:
+        record (pyvcf record)
+    Returns:
+        list of variant id strings
+    """
+    all_variant_ids = []
+    POSstr = '{0:09d}'.format(record.POS) # add leading 0s
+    for alt_allele in record.ALT:
+        all_variant_ids.append('_'.join([str(x) for x in [record.CHROM, POSstr,
+                                        record.REF, alt_allele]]))
+    return all_variant_ids
+
 def sample_id_from_fname(fname):
     """Extract same id from filename"""
     sample_id = os.path.basename(fname).split('.')[0]
@@ -152,6 +167,16 @@ def extract_record_info(record, field):
         return info
     except KeyError:
         return 'NA'
+
+def extract_record_info_multi(record, field):
+    all_info = []
+    try:
+        info = record.INFO[field]
+        for x in info:
+            all_info.append(info[0])
+        return all_info
+    except KeyError:
+        return ['NA']
 
 def which_recovered(recovered_names, all_names):
     """Produce dictionary of recovered TRUE/FALSE"""

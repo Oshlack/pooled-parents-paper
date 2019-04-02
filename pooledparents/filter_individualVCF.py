@@ -1,6 +1,7 @@
 import argparse
 import sys
 import vcf
+from vcf.parser import _Filter
 import os
 from collections import Counter
 # shared functions
@@ -14,217 +15,149 @@ __email__ = "h.dashnow@gmail.com"
 
 def parse_args():
     """Parse the input arguments, use '-h' for help"""
-    parser = argparse.ArgumentParser(description='Filter proband vcfs based on a pooled parent vcf and report recall per variant')
+    parser = argparse.ArgumentParser(description=('Filter proband vcfs based on'
+        ' a pooled parent vcf and report recall per variant'))
     parser.add_argument(
         '--individual_vcfs', type=str, required=True, nargs='+',
-        help='One or more vcfs containing variant calls from individuals used to simulate the pools')
+        help='VCFs containing variant calls from all probands (one for each individual)')
     parser.add_argument(
-        '--pool_vcfs', type=str, required=True, nargs='+',
-        help='One or more vcfs containing variant calls for the simulated pools')
-    parser.add_argument(
-        '--pool_specs', type=str, required=True, nargs='+',
-        help='One or more text files specifying the bam files used for the simulated pools. Names must correspond to the vcf names in --pool_vcfs')
+        '--pool_vcf', type=str, required=True,
+        help='A single VCF containing variant calls for the pool')
     parser.add_argument(
         '--out_csv', type=str, required=False, default='pools_probands.compare.csv',
         help='Output filename for csv (default: %(default)s)')
     parser.add_argument(
+        '--suffix', type=str, required=False, default='.pool_filter.vcf',
+        help=('Output suffix for filtered proband VCFs. Filenames will be in '
+            'the form inferred_sample_ID + suffix (default: %(default)s)'))
+    parser.add_argument(
         '--falsepos', action='store_true',
-        help='Report false positives as additional lines in the output csv.')
-
+        help=('Report false positives as additional lines in the output csv '
+            '(only relevant for comparing pooled vs. individual sequencing of '
+            'the same individuals).'))
+    parser.add_argument(
+        '--exclude_filtered', action='store_true',
+        help=('Do not output filtered variants to the individual VCFs. By '
+            'default filtered variants are reported with the value "inPool" in '
+            'the FILTER field.'))
     return parser.parse_args()
 
-def parse_pool_specs(spec_files):
-    """ Expecting file contents in the form:
-    [/my/dir/sample1.bam, /my/dir/sample2.bam]
+def parse_pool_vcf(pool_vcf_file):
+    """Parse pool VCF and save all variants found in them
+    Args:
+        pool_vcf_file (str): path to pool VCF file
+    Returns:
+        set: variant ids for all variants in the pool VCF
     """
-    pool_specs = {}
-    for spec_file in spec_files:
-        with open(spec_file) as f:
-            samples_txt = f.read()
-            pool_id = sample_id_from_fname(spec_file)
-            samples = []
-            for sample_txt in samples_txt.split(', '):
-                sample_bam = sample_txt.lstrip().rstrip().lstrip('[').rstrip(']')
-                proband_id = sample_id_from_fname(sample_bam)
+    pool_vars = set()
 
-                samples.append(proband_id)
-            pool_specs[pool_id] = samples
-    return(pool_specs)
+    pool = sample_id_from_fname(pool_vcf_file)
+
+    with open(pool_vcf_file, 'r') as this_vcf:
+        for record in vcf.Reader(this_vcf):
+            variants = variant_id_split(record)
+            for variant in variants: # usually one, but could be multiple
+                pool_vars.add(variant)
+    return pool_vars
+
+def R_bool(py_bool):
+    """Convert python bool (True/False) to a string that can be read as a bool
+    by R (TRUE/FALSE/NA)"""
+    if py_bool == None:
+        return 'NA'
+    if py_bool:
+        return 'TRUE'
+    elif not py_bool:
+        return 'FALSE'
+    else:
+        return 'NA'
 
 def main():
     # Parse command line arguments
     args = parse_args()
     individual_vcf_files = args.individual_vcfs
-    pool_vcf_files = args.pool_vcfs
-    pool_spec_files = args.pool_specs
+    pool_vcf_file = args.pool_vcf
     outfile = args.out_csv
+    out_vcf_suffix = args.suffix
+    report_falsepos = args.falsepos
+    output_filtered = not args.exclude_filtered
 
     outstream = open(outfile, 'w')
 
     # Write header
-    outstream.write(('pool,proband,variant,recovered_proband,recovered,falsepos,'
-                    'nonref_alleles_pool,total_alleles_pool,'
-                    'nonref_alleles_probands,total_alleles_probands,'
-                    'nonref_reads_pool,total_reads_pool,nonref_reads_probands,'
-                    'QD_pool,GT_pool,QD_proband,AF_EXOMESgnomad'
+    outstream.write(('proband,variant,recovered_proband,falsepos,'
+                    'QD,AF_EXOMESgnomad'
                     '\n'))
 
-    pool_specs = parse_pool_specs(pool_spec_files)
+    # Parse vcfs for pools
+    # Simply record which variants were found in the pool
+    pool_vars = parse_pool_vcf(pool_vcf_file)
 
     # Parse vcfs of individuals
-    # Variants from individual probands, allocated to the pool to which they belong
-    proband_vars_by_pool = {} # {pool : { variant_id: {key:values} } }
-    for pool in pool_specs:
-        proband_vars_by_pool[pool] = {}
-
+    individual_vars = set()
     for vcf_file in individual_vcf_files:
-        proband_id = sample_id_from_fname(vcf_file)
-
-        pools_sample_is_in = [ pool for pool in pool_specs if proband_id in pool_specs[pool] ]
-
+        proband = sample_id_from_fname(vcf_file)
         with open(vcf_file, 'r') as this_vcf:
             vcf_reader = vcf.Reader(this_vcf)
-            #vcf_writer = vcf.Writer(open(proband_id+".filtered.vcf", 'w'), vcf_reader)
-            #XXX add functionality to output filtered vcfs
+            # Add an aditional filter that will be inherited by the vcf writer
+            vcf_reader.filters['InPool'] = _Filter('InPool',
+                'All alleles found in the probands are also found in the pool.')
+            # Create vcf writer based on the header from the input vcf
+            vcf_writer = vcf.Writer(open(proband + out_vcf_suffix, 'w'), vcf_reader)
+
             for record in vcf_reader:
-
-                variant = variant_id(record)
-
-                nonref_alleles_this_proband, total_alleles_this_proband = count_nonref_alleles(record.samples[0]['GT'])
-                nonref_reads_this_proband = count_nonref_reads(record.samples[0])
-
-                AF_EXOMESgnomad = extract_record_info(record, 'AF_EXOMESgnomad')
+                falsepos = 'FALSE'
                 qual = record.QUAL
                 QD = qual/record.INFO['DP']
 
-                for pool in pools_sample_is_in:
-                    if variant not in proband_vars_by_pool[pool]:
-                        proband_vars_by_pool[pool][variant] = {
-                                                            'nonref_alleles_probands': 0,
-                                                            'total_alleles_probands': 0,
-                                                            'nonref_reads_probands': 0,
-                                                            'probands_with_variant': set(),
-                                                            }
-                    proband_vars_by_pool[pool][variant]['nonref_alleles_probands'] += nonref_alleles_this_proband
-                    proband_vars_by_pool[pool][variant]['total_alleles_probands'] += total_alleles_this_proband
-                    proband_vars_by_pool[pool][variant]['nonref_reads_probands'] += nonref_reads_this_proband
-                    proband_vars_by_pool[pool][variant]['probands_with_variant'].add(proband_id)
-                    proband_vars_by_pool[pool][variant]['AF_EXOMESgnomad'] = AF_EXOMESgnomad
-                    proband_vars_by_pool[pool][variant]['QD_proband'] = QD
+                variants = variant_id_split(record)
+                AF_EXOMESgnomad_all = extract_record_info_multi(record, 'AF_EXOMESgnomad')
+                if len(AF_EXOMESgnomad_all) != len(variants):
+                    if not AF_EXOMESgnomad_all == ['NA']:
+                        sys.stderr.write(('WARNING: Number of variant allelese and gnomAD '
+                            'records do not match. Writing AF_EXOMESgnomad = NA '
+                            'for all. Variants: {} AF_EXOMESgnomad {} \n'
+                            ).format(variants, AF_EXOMESgnomad_all))
+                    AF_EXOMESgnomad_all = ['NA'] * len(variants)
 
-    # Parse vcfs for pools
-    pool_vars = {}
-    nonref_allele_counts = {}
-    pool_vars_details = {} # {pool : { variant_id: {key:values} } }
-    for pool_vcf_file in pool_vcf_files:
+                all_variants_in_pool = True
+                for variant, AF_EXOMESgnomad in zip(variants, AF_EXOMESgnomad_all):
+                    individual_vars.add(variant)
+                    variant_in_pool = variant in pool_vars
+                    # If any variant is not in the pool, then set to false
+                    if not variant_in_pool:
+                        all_variants_in_pool = False
 
-        pool = sample_id_from_fname(pool_vcf_file)
-        pool_vars[pool] = set()
-        pool_vars_details[pool] = {}
+                    variant_in_pool = R_bool(variant_in_pool)
+                    outstream.write(','.join([str(x) for x in [
+                        proband, variant, variant_in_pool, falsepos,
+                        QD, AF_EXOMESgnomad
+                        ]]) + '\n')
 
+                # Either report variants as filtered in the VCF or skip them completely
+                if all_variants_in_pool:
+                    if output_filtered:
+                        record.FILTER = 'InPool' # Set in_pool vcf filter
+                        vcf_writer.write_record(record)
+                else:
+                    vcf_writer.write_record(record)
+
+    if report_falsepos:
+        proband = 'NA'
+        variant_in_pool = 'TRUE'
+        falsepos = 'TRUE'
+        QD = 'NA'
+        AF_EXOMESgnomad = 'NA'
         with open(pool_vcf_file, 'r') as this_vcf:
             for record in vcf.Reader(this_vcf):
-                variant = variant_id(record)
-                pool_vars[pool].add(variant)
-
-                GT_pool = record.samples[0]['GT']
-                nonref_alleles_pool, total_alleles_pool = count_nonref_alleles(GT_pool)
-                #nonref_allele_counts[variant] = nonref_allele_pool
-                nonref_reads_pool = count_nonref_reads(record.samples[0])
-                total_reads_pool = record.samples[0]['DP']
-                qual = record.QUAL
-                try:
-                    QD_pool = qual/record.INFO['DP']
-                except KeyError:
-                    QD_pool = 'NA'
-
-                if variant not in pool_vars_details[pool]:
-                    pool_vars_details[pool][variant] = {
-                                                        'nonref_alleles_pool': nonref_alleles_pool,
-                                                        'total_alleles_pool': total_alleles_pool,
-                                                        'nonref_reads_pool': nonref_reads_pool,
-                                                        'total_reads_pool': total_reads_pool,
-                                                        'GT_pool': GT_pool,
-                                                        'QD_pool': QD_pool
-                                                        }
-                else:
-                    raise Exception('This variant already reported in this pool. Logic error?')
-
-                if args.falsepos: # if reporting false positives
-                    # Check if false positive (and only report those)
-                    if variant not in proband_vars_by_pool[pool]:
-                        recovered = 'FALSE'
-                        falsepos = 'TRUE'
-                        # Assign some NA values
-                        proband = 'NA'
-                        recovered_proband = 'NA'
-                        QD_proband = 'NA'
-                        AF_EXOMESgnomad = 'NA'
-
-                        nonref_alleles_pool = pool_vars_details[pool][variant]['nonref_alleles_pool']
-                        nonref_reads_pool = pool_vars_details[pool][variant]['nonref_reads_pool']
-                        total_reads_pool = pool_vars_details[pool][variant]['total_reads_pool']
-                        GT_pool = pool_vars_details[pool][variant]['GT_pool']
-                        QD_pool = pool_vars_details[pool][variant]['QD_pool']
-
-                        if variant in proband_vars_by_pool[pool]:
-                            raise Error(("False positive variant from pool found "
-                                        "in one of the probands. This doesn't "
-                                        "make sense. Logic error in code?"))
-                        else:
-                            nonref_alleles_probands = 'NA'
-                            total_alleles_probands = 'NA'
-                            nonref_reads_probands = 'NA'
-
+                variants = variant_id_split(record)
+                for variant in variants: # usually one, but could be multiple
+                    if not variant in individual_vars:
                         outstream.write(','.join([str(x) for x in [
-                            pool, proband, variant, recovered, recovered_proband, falsepos,
-                            nonref_alleles_pool, total_alleles_pool,
-                            nonref_alleles_probands, total_alleles_probands,
-                            nonref_reads_pool, total_reads_pool, nonref_reads_probands,
-                            QD_pool,GT_pool,QD_proband,AF_EXOMESgnomad
+                            proband, variant, variant_in_pool, falsepos,
+                            QD, AF_EXOMESgnomad
                             ]]) + '\n')
 
-    for pool in proband_vars_by_pool:
-        for variant in proband_vars_by_pool[pool]:
-
-            falsepos = 'FALSE'
-            if variant in pool_vars[pool]:
-                recovered = "TRUE"
-                nonref_alleles_pool = pool_vars_details[pool][variant]['nonref_alleles_pool']
-                total_alleles_pool = pool_vars_details[pool][variant]['total_alleles_pool']
-                nonref_reads_pool = pool_vars_details[pool][variant]['nonref_reads_pool']
-                total_reads_pool = pool_vars_details[pool][variant]['total_reads_pool']
-                GT_pool = pool_vars_details[pool][variant]['GT_pool']
-                QD_pool = pool_vars_details[pool][variant]['QD_pool']
-                recovery_by_proband = which_recovered(proband_vars_by_pool[pool][variant]['probands_with_variant'],
-                                        pool_specs[pool])
-            else:
-                recovered = "FALSE"
-                nonref_alleles_pool = 'NA'
-                total_alleles_pool = 'NA'
-                nonref_reads_pool = 'NA'
-                total_reads_pool = 'NA'
-                GT_pool = 'NA'
-                QD_pool = 'NA'
-                # report recovered_proband FALSE for each proband
-                recovery_by_proband = which_recovered([],proband_vars_by_pool[pool][variant]['probands_with_variant'])
-
-            nonref_alleles_probands = proband_vars_by_pool[pool][variant]['nonref_alleles_probands']
-            total_alleles_probands = proband_vars_by_pool[pool][variant]['total_alleles_probands']
-            nonref_reads_probands = proband_vars_by_pool[pool][variant]['nonref_reads_probands']
-            QD_proband = proband_vars_by_pool[pool][variant]['QD_proband']
-            AF_EXOMESgnomad = proband_vars_by_pool[pool][variant]['AF_EXOMESgnomad']
-
-            for proband in recovery_by_proband:
-                recovered_proband = recovery_by_proband[proband]
-
-                outstream.write(','.join([str(x) for x in [
-                    pool, proband, variant, recovered, recovered_proband, falsepos,
-                    nonref_alleles_pool, total_alleles_pool,
-                    nonref_alleles_probands, total_alleles_probands,
-                    nonref_reads_pool, total_reads_pool, nonref_reads_probands,
-                    QD_pool,GT_pool,QD_proband,AF_EXOMESgnomad
-                    ]]) + '\n')
 
     outstream.close
 
