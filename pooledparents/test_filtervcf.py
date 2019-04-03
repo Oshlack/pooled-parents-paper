@@ -18,6 +18,22 @@ def test_variant_id(position, expected):
                 var_id = variant_id(record)
                 assert var_id == expected
 
+@pytest.mark.parametrize("position, expected", [
+    (69270, 'chr1_000069270'),
+    (894573, 'chr1_000894573'),
+    (26083991, 'chr1_026083991'),
+])
+def test_variant_position(position, expected):
+    dir_this_file = os.path.dirname(os.path.realpath(__file__)) + '/'
+    datadir = dir_this_file + "test_data/"
+    vcf_file = datadir+"SRR1301861.vcf"
+    with open(vcf_file, 'r') as this_vcf:
+        vcf_reader = vcf.Reader(this_vcf)
+        for record in vcf_reader:
+            if record.POS == position:
+                pos_id = variant_position(record)
+                assert pos_id == expected
+
 @pytest.mark.parametrize("fname, expected", [
     ('test.bam', 'test'),
     ('merge.10.bam', '10'),

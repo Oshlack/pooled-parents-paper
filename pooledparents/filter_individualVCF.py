@@ -105,7 +105,9 @@ def main():
     outstream = open(outfile, 'w')
     # Write header
     outstream.write(('proband,variant,recovered_proband,falsepos,'
-                    'QD,AF_EXOMESgnomad'
+                    'QD,AF_EXOMESgnomad,nonref_alleles_proband,'
+                    'total_alleles_proband,nonref_reads_proband,'
+                    'position'
                     '\n'))
 
     # Parse vcfs for pools
@@ -137,6 +139,9 @@ def main():
                 qual = record.QUAL
                 QD = qual/record.INFO['DP']
                 #XXX Count alleles/reads supporting this variant
+                nonref_alleles_proband, total_alleles_proband = count_nonref_alleles(record.samples[0]['GT'])
+                nonref_reads_proband = count_nonref_reads(record.samples[0])
+                position = variant_position(record)
 
                 variants = variant_id_split(record)
                 AF_EXOMESgnomad_all = extract_record_info_multi(record, 'AF_EXOMESgnomad')
@@ -159,7 +164,9 @@ def main():
                     variant_in_pool = R_bool(variant_in_pool)
                     outstream.write(','.join([str(x) for x in [
                         proband, variant, variant_in_pool, falsepos,
-                        QD, AF_EXOMESgnomad
+                        QD, AF_EXOMESgnomad, nonref_alleles_proband,
+                        total_alleles_proband, nonref_reads_proband,
+                        position
                         ]]) + '\n')
 
                 # Either report variants as filtered in the VCF or skip them completely
@@ -185,6 +192,9 @@ def main():
         falsepos = 'TRUE'
         QD = 'NA'
         AF_EXOMESgnomad = 'NA'
+        nonref_alleles_proband = 'NA'
+        total_alleles_proband = 'NA'
+        nonref_reads_proband = 'NA'
         with open(pool_vcf_file, 'r') as this_vcf:
             for record in vcf.Reader(this_vcf):
                 variants = variant_id_split(record)
@@ -192,7 +202,9 @@ def main():
                     if not variant in individual_vars:
                         outstream.write(','.join([str(x) for x in [
                             proband, variant, variant_in_pool, falsepos,
-                            QD, AF_EXOMESgnomad
+                            QD, AF_EXOMESgnomad, nonref_alleles_proband,
+                            total_alleles_proband, nonref_reads_proband,
+                            position
                             ]]) + '\n')
 
 

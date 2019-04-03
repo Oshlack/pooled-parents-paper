@@ -14,6 +14,11 @@ def variant_id(record):
     POSstr = '{0:09d}'.format(record.POS) # add leading 0s
     return '_'.join([str(x) for x in [record.CHROM, POSstr, record.REF, ALTstr]])
 
+def variant_position(record):
+    """Create position ID for each locus so can collapse variants at the same position"""
+    POSstr = '{0:09d}'.format(record.POS) # add leading 0s
+    return '_'.join([str(x) for x in [record.CHROM, POSstr]])
+
 def variant_id_split(record):
     """Create a unique ID for each variant so they can be compared
     If multiple variant alleles, split them up.
