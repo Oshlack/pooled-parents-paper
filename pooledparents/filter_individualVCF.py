@@ -24,6 +24,10 @@ def parse_args():
         '--pool_vcf', type=str, required=True,
         help='A single VCF containing variant calls for the pool')
     parser.add_argument(
+        '--pool_specs', type=str, required=True,
+        help=('A text file specifying the bam files used for the simulated '
+            'pools. Names must correspond to the vcf names in --individual_vcfs'))
+    parser.add_argument(
         '--out_csv', type=str, required=False, default='pools_probands.compare.csv',
         help='Output filename for csv (default: %(default)s)')
     parser.add_argument(
@@ -41,6 +45,19 @@ def parse_args():
             'default filtered variants are reported with the value "inPool" in '
             'the FILTER field.'))
     return parser.parse_args()
+
+def parse_pool_specs(spec_file):
+    """ Expecting file contents in the form:
+    [/my/dir/sample1.bam, /my/dir/sample2.bam]
+    """
+    with open(spec_file) as f:
+        samples_txt = f.read()
+        samples = []
+        for sample_txt in samples_txt.split(', '):
+            sample_bam = sample_txt.lstrip().rstrip().lstrip('[').rstrip(']')
+            proband_id = sample_id_from_fname(sample_bam)
+            samples.append(proband_id)
+    return(samples)
 
 def parse_pool_vcf(pool_vcf_file):
     """Parse pool VCF and save all variants found in them
@@ -77,13 +94,15 @@ def main():
     args = parse_args()
     individual_vcf_files = args.individual_vcfs
     pool_vcf_file = args.pool_vcf
+    pool_spec_file = args.pool_specs
     outfile = args.out_csv
     out_vcf_suffix = args.suffix
     report_falsepos = args.falsepos
     output_filtered = not args.exclude_filtered
 
-    outstream = open(outfile, 'w')
+    probands_in_pool = parse_pool_specs(pool_spec_file)
 
+    outstream = open(outfile, 'w')
     # Write header
     outstream.write(('proband,variant,recovered_proband,falsepos,'
                     'QD,AF_EXOMESgnomad'
@@ -92,11 +111,19 @@ def main():
     # Parse vcfs for pools
     # Simply record which variants were found in the pool
     pool_vars = parse_pool_vcf(pool_vcf_file)
-
+    nonref_alleles_probands = {}
     # Parse vcfs of individuals
     individual_vars = set()
+
+    probands_found = []
     for vcf_file in individual_vcf_files:
         proband = sample_id_from_fname(vcf_file)
+
+        if proband not in probands_in_pool:
+            continue # Skip any vcf files that don't match up with the pool specs
+
+        probands_found.append(proband)
+
         with open(vcf_file, 'r') as this_vcf:
             vcf_reader = vcf.Reader(this_vcf)
             # Add an aditional filter that will be inherited by the vcf writer
@@ -109,6 +136,7 @@ def main():
                 falsepos = 'FALSE'
                 qual = record.QUAL
                 QD = qual/record.INFO['DP']
+                #XXX Count alleles/reads supporting this variant
 
                 variants = variant_id_split(record)
                 AF_EXOMESgnomad_all = extract_record_info_multi(record, 'AF_EXOMESgnomad')
@@ -142,6 +170,15 @@ def main():
                 else:
                     vcf_writer.write_record(record)
 
+    if set(probands_in_pool) != set(probands_found):
+        raise ValueError(('Based on --pool_specs, expecting VCFs for '
+            'the probands: {}, found VCFs for: {}. Please check that file '
+            'given for --pool_specs is correct and that all proband VCFs are '
+            'provided and named correctly.').format(sorted(probands_in_pool),
+            sorted(probands_found)))
+
+    # If false positives required, go through pooled vcf again and report them
+    # Can do this without looping through again?
     if report_falsepos:
         proband = 'NA'
         variant_in_pool = 'TRUE'
