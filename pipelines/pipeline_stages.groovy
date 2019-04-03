@@ -407,18 +407,18 @@ intersect_vcf = {
 
 compare_sim = {
 
-    output.dir="variants"
+    //output.dir="variants"
 
-    from('*.vcf') produce(input.prefix + '.pooled_sim_compare.csv') {
+    from('*.vcf') produce('pool_' + branch.num_samples + '.gatk_individual.pooled_sim_compare.csv') {
 
         exec """
-            /group/bioi1/harrietd/git/STRetch/tools/bin/python
-                /group/bioi1/harrietd/git/pooled_simulation/pooledparents/filter_individualVCF.py
-                --individual_vcfs /group/bioi1/harrietd/pooled-parent/pooled_simulation2/simplex/individuals/variants/SRR???????.vcf
+            $PYTHON
+                $SCRIPTS/filter_individualVCF.py
+                --individual_vcfs $IND_VCFS_GATK
                 --pool_vcf $inputs.vcf
                 --pool_specs $input.txt
                 --out_csv $output.csv
-                --suffix ${'.filtered_pool_' + input.prefix + '.vcf'}
+                --suffix ${'.filtered_pool_' + branch.num_samples + '.vcf'}
                 --falsepos
     """
     }
@@ -444,17 +444,17 @@ compare_sim_probands = {
 
 compare_sim_freebayes = {
 
-    output.dir="variants"
+    //output.dir="variants"
 
-    from('*.vcf') produce('pooled_sim_compare.csv') {
-
+    from('*.vcf') produce('pool_' + branch.num_samples + '.freebayes_individual.pooled_sim_compare.csv') {
         exec """
-            /group/bioi1/harrietd/git/STRetch/tools/bin/python
-                /group/bioi1/harrietd/git/pooled_simulation/pooledparents/filter_individualVCF.py
-                --individual_vcfs /group/bioi1/harrietd/pooled-parent/pooled_simulation2/simplex/individuals_joint/freebayes/variants/*.vcf
-                --pool_vcfs $inputs.vcf
-                --pool_specs $inputs.txt
+            $PYTHON
+                $SCRIPTS/filter_individualVCF.py
+                --individual_vcfs $IND_VCFS_FREEBAYES
+                --pool_vcf $inputs.vcf
+                --pool_specs $input.txt
                 --out_csv $output.csv
+                --suffix ${'.filtered_pool_' + branch.num_samples + '.vcf'}
                 --falsepos
     """
 
