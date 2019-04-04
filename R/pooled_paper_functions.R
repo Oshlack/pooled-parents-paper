@@ -146,14 +146,21 @@ extract_ind_csvs = function(data_dir, replicates, sim_type) {
     for (f in sim_files) {
       data = read.csv(paste0(data_dir, f), stringsAsFactors = F)
       data$simulation = simulation
+      data$pool = as.integer(strsplit(strsplit(f, '.', fixed = T)[[1]][2], '_')[[1]][2])
+      # Calculate nonref_allele_count_truth over all probands
+      group_by(data, variant) %>% 
+        summarise(nonref_allele_count_truth = sum(nonref_alleles_proband, na.rm = T),
+                  total_alleles_probands = sum(total_alleles_proband, na.rm = T),
+                  nonref_reads_probands = sum(nonref_reads_proband, na.rm = T)
+        ) -> summed_alleles
+      data = merge(data, summed_alleles, all.x = T)
       all_data_list[[(length(all_data_list) +1)]] = data
     }
   }
   all_data = bind_rows(all_data_list)
   all_data$simulation = as.factor(all_data$simulation)
   all_data$sim_type = sim_type
-  colnames(all_data)[colnames(all_data)=="recovered_in_proband"] <- "recovered"
-  colnames(all_data)[colnames(all_data)=="nonref_alleles_probands"] <- "nonref_allele_count_truth"
+  all_data$recovered = all_data$recovered_proband
   
   end.time <- Sys.time()
   time.taken <- end.time - start.time

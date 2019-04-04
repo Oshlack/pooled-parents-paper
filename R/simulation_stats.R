@@ -15,7 +15,7 @@ sim_type_order = c("constant depth", "additive depth")
 data_dir = 'data/gatk_individual/'
 
 ## Constant Depth
-replicates = c('random_pools', 'random_pools2', 'random_pools3')
+replicates = c('const_rep1', 'const_rep2', 'const_rep3')
 all_data_ind_const = extract_ind_csvs(data_dir, replicates, 
                                       sim_type = 'constant depth')
 #all_data_ind_const = all_data_ind_const[all_data_ind_const$pool < 20,] # remove large pools
@@ -29,7 +29,7 @@ poolstats_ind_const_probands_fp$sim_type = 'constant depth'
 rm(all_data_ind_const)
 
 ## additive Depth
-replicates = c('depth_pools', 'depth_pools2', 'depth_pools3')
+replicates = c('depth_rep1', 'depth_rep2', 'depth_rep3')
 all_data_ind_prop = extract_ind_csvs(data_dir, replicates, 
                                      sim_type = 'additive depth')
 all_data_ind_prop$variantcaller = "gatk individual"
@@ -44,8 +44,7 @@ rm(all_data_ind_prop)
 data_dir = 'data/gatk_joint/'
 
 # Constant Depth
-replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint')#, 
-#'random_pools4_joint', 'random_pools5_joint', 'random_pools6_joint')
+replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint')
 all_data_joint_const = extract_multi_csvs(data_dir, replicates, 
                                           sim_type = 'constant depth')
 all_data_joint_const$variantcaller = "gatk joint"
@@ -57,8 +56,7 @@ poolstats_joint_const_probands_fp$sim_type = 'constant depth'
 rm(all_data_joint_const)
 
 # Proportinal Depth
-replicates = c('depth_pools_joint', 'depth_pools2_joint', 'depth_pools3_joint')#,
-#'depth_pools4_joint', 'depth_pools5_joint', 'depth_pools6_joint')
+replicates = c('depth_pools_joint', 'depth_pools2_joint', 'depth_pools3_joint')
 all_data_joint_prop = extract_multi_csvs(data_dir, replicates,
                                          sim_type = 'additive depth')
 all_data_joint_prop$variantcaller = "gatk joint"
@@ -73,9 +71,7 @@ rm(all_data_joint_prop)
 data_dir = 'data/freebayes/'
 
 ## Constant Depth freebayes
-replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint')
-# replicates = c('random_pools_joint', 'random_pools2_joint', 'random_pools3_joint',
-#                'random_pools4_joint', 'random_pools5_joint', 'random_pools6_joint')
+replicates = c('const_rep1', 'const_rep2', 'const_rep3')
 all_data_fb_const = extract_ind_csvs(data_dir, replicates,
                                      sim_type = 'constant depth')
 all_data_fb_const$variantcaller = "freebayes highqual"
