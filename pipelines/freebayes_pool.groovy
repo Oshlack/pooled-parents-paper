@@ -4,6 +4,7 @@ load 'pipeline_stages.groovy'
 set_pool = {
     branch.num_samples = branch.name.split("\\.")[1].toInteger()
     branch.ploidy = branch.num_samples*2
+    branch.specfile = branch.num_samples + '.txt'
 }
 
 

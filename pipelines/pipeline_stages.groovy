@@ -446,7 +446,7 @@ compare_sim_freebayes = {
 
     //output.dir="variants"
 
-    from('*.vcf') produce('pool_' + branch.num_samples + '.freebayes_individual.pooled_sim_compare.csv') {
+    from('*.vcf', branch.specfile) produce('pool_' + branch.num_samples + '.freebayes_individual.pooled_sim_compare.csv') {
         exec """
             $PYTHON
                 $SCRIPTS/filter_individualVCF.py
