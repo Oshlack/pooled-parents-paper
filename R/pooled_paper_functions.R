@@ -180,7 +180,7 @@ convert_location = function(l) {
 
 variant_to_location = function(variant) {
   v_split = strsplit(variant, '_')
-  return(paste0(v_split[[1]][1:2], collapse = '_'))
+  return(paste0(v_split[[1]][c(1,2,4)], collapse = '_'))
 }
 
 # Extract vep tsv annotations from multiple individuals
@@ -197,6 +197,7 @@ extract_vep_tsvs = function(data_dir) {
   }
   all_data = bind_rows(all_data_list)
   all_data$location_str = sapply(all_data$Location, convert_location)
+  all_data$location_str = paste(all_data$location_str, all_data$Allele, sep = '_')
   return(all_data)
 }
 
