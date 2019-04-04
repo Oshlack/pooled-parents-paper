@@ -32,6 +32,8 @@ VEP_SYN="/group/bioi1/shared/genomes/GRCh37/vep_chr_synonyms.txt"
 // Individually called VCFs for samples that make up the pools
 IND_VCFS_GATK='/group/bioi1/harrietd/pooled-parent/pooled_simulation2/simplex/individuals/variants/SRR???????.vcf'
 IND_VCFS_FREEBAYES='/group/bioi1/harrietd/pooled-parent/pooled_simulation2/simplex/individuals_joint/freebayes/variants/*.vcf'
+PROBAND_VCFS='/group/bioi1/harrietd/pooled-parent/proband_genotyping/variants/*.vep.vcf'
+
 
 // Configuration files
 VCFANNO_CONFIG="/group/bioi1/harrietd/git/pooled_simulation/gnomadExomeGenomeSHORT_self.toml"

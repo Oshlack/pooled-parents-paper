@@ -16,6 +16,7 @@ run {
         coverage +
         call_variants + 
         annotate_vcf +
-        intersect_vcf
+        compare_sim_probands
+        //intersect_vcf
     ]
 }

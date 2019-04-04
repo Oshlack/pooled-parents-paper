@@ -27,7 +27,7 @@ set_sample_info = {
 set_fastq_info = {
     def info = get_info(input)
 
-    //branch.sample = info[0]
+    branch.sample = info[0]
 
     if (info.length >= 2) {
         branch.lane = info[-2]
@@ -426,18 +426,18 @@ compare_sim = {
 
 compare_sim_probands = {
 
-    output.dir="variants"
+    //output.dir="variants"
 
-    from('*.vcf') produce('pooled_sim_compare.csv') {
+    from('*.vcf') produce('Parental-pool.compare.csv') {
 
         exec """
-            /group/bioi1/harrietd/git/STRetch/tools/bin/python
-                /group/bioi1/harrietd/git/pooled_simulation/pooledparents/filter_individualVCF.py
-                --individual_vcfs /group/bioi1/harrietd/pooled-parent/proband_genotyping/variants/*.vcf
+            $PYTHON
+                $SCRIPTS/filter_individualVCF.py
+                --individual_vcfs $PROBAND_VCFS
                 --pool_vcfs $inputs.vcf
                 --pool_specs $inputs.txt
                 --out_csv $output.csv
-                --falsepos
+                --suffix ${'.parentpool_filter.vcf'}
     """
     }
 }
