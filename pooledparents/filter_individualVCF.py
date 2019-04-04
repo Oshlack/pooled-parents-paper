@@ -137,8 +137,11 @@ def main():
             for record in vcf_reader:
                 falsepos = 'FALSE'
                 qual = record.QUAL
-                QD = qual/record.INFO['DP']
-                #XXX Count alleles/reads supporting this variant
+                try:
+                    QD = qual/record.INFO['DP']
+                except KeyError:
+                    QD = 'NA'
+                # Count alleles/reads supporting this variant
                 nonref_alleles_proband, total_alleles_proband = count_nonref_alleles(record.samples[0]['GT'])
                 nonref_reads_proband = count_nonref_reads(record.samples[0])
                 position = variant_position(record)
