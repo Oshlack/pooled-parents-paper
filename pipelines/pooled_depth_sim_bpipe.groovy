@@ -20,7 +20,8 @@ run {
         set_pool +
         merge_bams + fix_header +
         dedup +
-        call_variants
-    ] + compare_sim
+        call_variants +
+        compare_sim
+    ]
 }
 

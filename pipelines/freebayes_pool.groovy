@@ -1,3 +1,4 @@
+load 'pipeline_config.groovy'
 load 'pipeline_stages.groovy'
 
 set_pool = {
@@ -8,6 +9,9 @@ set_pool = {
 
 @transform("vcf")
 call_variants_freebayes = {
+
+    output.dir='variants'
+
     exec """
         freebayes 
             --ploidy $ploidy 

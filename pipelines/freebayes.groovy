@@ -1,7 +1,11 @@
+load 'pipeline_config.groovy'
 load 'pipeline_stages.groovy'
 
 @transform("vcf")
 call_variants_freebayes = {
+
+    output.dir='variants'
+
     exec """
         freebayes --fasta-reference /group/bioi1/shared/genomes/hg19/gatk/gatk.ucsc.hg19.fasta $input.bam > $output.vcf
     """, "freebayes"
