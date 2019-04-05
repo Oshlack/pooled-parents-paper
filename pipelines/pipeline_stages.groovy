@@ -434,7 +434,7 @@ compare_sim_probands = {
             $PYTHON
                 $SCRIPTS/filter_individualVCF.py
                 --individual_vcfs $PROBAND_VCFS
-                --pool_vcfs $inputs.vcf
+                --pool_vcf $inputs.vcf
                 --pool_specs $inputs.txt
                 --out_csv $output.csv
                 --suffix ${'.parentpool_filter.vcf'}
