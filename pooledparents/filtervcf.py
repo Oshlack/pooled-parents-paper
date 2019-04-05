@@ -183,6 +183,29 @@ def extract_record_info_multi(record, field):
     except KeyError:
         return ['NA']
 
+def get_variants_and_info(record, info_field, split_vars = False):
+    """From a VCF record, get the variant id and a value from an info field.
+    Split form of variants: ['chrom_position_ref_al1', 'chrom_position_ref_alt2']
+    Non-split form: ['chrom_position_ref_al1/alt2']
+    If splitting, the info_field will return all values, if not splitting then 
+    if the info field has multiple values only ['NA'] will be returned.
+    Args:
+        record (pyvcf.record)
+        info_field (string): e.g. annotation like 'AF_EXOMESgnomad'
+        split_vars (bool): If true, each allele at this position will be returned
+            separately.
+    Returns:
+        variants (list), info (list)
+    """
+    if split_vars:
+        variants = variant_id_split(record)
+        info = extract_record_info_multi(record, info_field)
+    else:
+        variants = [variant_id(record)]
+        info = [extract_record_info(record, info_field)]
+
+    return(variants, info)
+
 def which_recovered(recovered_names, all_names):
     """Produce dictionary of recovered TRUE/FALSE"""
     recovery_dict = {}

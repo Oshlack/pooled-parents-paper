@@ -44,6 +44,11 @@ def parse_args():
         help=('Do not output filtered variants to the individual VCFs. By '
             'default filtered variants are reported with the value "inPool" in '
             'the FILTER field.'))
+    parser.add_argument(
+        '--split', action='store_true',
+        help=('Split multiallelic variants across multiple lines in the output '
+            'csv. By default loci with multiple variants are reported on a '
+            'single line in the form chrom_position_ref_al1/alt2'))
     return parser.parse_args()
 
 def parse_pool_specs(spec_file):
@@ -59,10 +64,12 @@ def parse_pool_specs(spec_file):
             samples.append(proband_id)
     return(samples)
 
-def parse_pool_vcf(pool_vcf_file):
+def parse_pool_vcf(pool_vcf_file, split_vars):
     """Parse pool VCF and save all variants found in them
     Args:
         pool_vcf_file (str): path to pool VCF file
+        split_vars (bool): If true, each allele at this position will be
+            returned separately.
     Returns:
         set: variant ids for all variants in the pool VCF
     """
@@ -72,7 +79,8 @@ def parse_pool_vcf(pool_vcf_file):
 
     with open(pool_vcf_file, 'r') as this_vcf:
         for record in vcf.Reader(this_vcf):
-            variants = variant_id_split(record)
+            variants, AF_EXOMESgnomad_all = get_variants_and_info(record,
+                'AF_EXOMESgnomad', split_vars)
             for variant in variants: # usually one, but could be multiple
                 pool_vars.add(variant)
     return pool_vars
@@ -99,6 +107,8 @@ def main():
     out_vcf_suffix = args.suffix
     report_falsepos = args.falsepos
     output_filtered = not args.exclude_filtered
+    split_vars = args.split
+    print(split_vars)
 
     probands_in_pool = parse_pool_specs(pool_spec_file)
 
@@ -112,7 +122,7 @@ def main():
 
     # Parse vcfs for pools
     # Simply record which variants were found in the pool
-    pool_vars = parse_pool_vcf(pool_vcf_file)
+    pool_vars = parse_pool_vcf(pool_vcf_file, split_vars)
     nonref_alleles_probands = {}
     # Parse vcfs of individuals
     individual_vars = set()
@@ -146,8 +156,8 @@ def main():
                 nonref_reads_proband = count_nonref_reads(record.samples[0])
                 position = variant_position(record)
 
-                variants = variant_id_split(record)
-                AF_EXOMESgnomad_all = extract_record_info_multi(record, 'AF_EXOMESgnomad')
+                variants, AF_EXOMESgnomad_all = get_variants_and_info(record,
+                    'AF_EXOMESgnomad', split_vars)
                 if len(AF_EXOMESgnomad_all) != len(variants):
                     if not AF_EXOMESgnomad_all == ['NA']:
                         sys.stderr.write(('WARNING: Number of variant allelese and gnomAD '
@@ -200,7 +210,8 @@ def main():
         nonref_reads_proband = 'NA'
         with open(pool_vcf_file, 'r') as this_vcf:
             for record in vcf.Reader(this_vcf):
-                variants = variant_id_split(record)
+                variants, AF_EXOMESgnomad_all = get_variants_and_info(record,
+                    'AF_EXOMESgnomad', split_vars)
                 for variant in variants: # usually one, but could be multiple
                     if not variant in individual_vars:
                         outstream.write(','.join([str(x) for x in [
