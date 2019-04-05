@@ -108,7 +108,6 @@ def main():
     report_falsepos = args.falsepos
     output_filtered = not args.exclude_filtered
     split_vars = args.split
-    print(split_vars)
 
     probands_in_pool = parse_pool_specs(pool_spec_file)
 
