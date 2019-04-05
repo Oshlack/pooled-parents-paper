@@ -438,6 +438,7 @@ compare_sim_probands = {
                 --pool_specs $inputs.txt
                 --out_csv $output.csv
                 --suffix ${'.parentpool_filter.vcf'}
+                --split
     """
     }
 }
