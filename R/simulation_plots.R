@@ -4,15 +4,10 @@ library("mcriPalettes")
 my.colours = c(1,4,5)
 
 # Either source to re-generate stats, or just load previous data
-#source('R/simulation_stats.R') # Uses about 80GB memory!
-load('data/simulation_summary_data.Robj')
+source('R/simulation_stats.R') # Uses about 80GB memory!
+#load('data/simulation_summary_data.Robj')
 
 plot_prefix = 'plots/compare_callers.'
-
-real_recall = 88.2
-real_recall_singleton = 91.1
-#real_recall = 78
-#real_recall_singleton = 72
 
 ### Plots functions with subsets
 
@@ -76,41 +71,58 @@ plot_fp(c("gatk individual", "gatk joint", "freebayes highqual"),
         c("constant depth", "additive depth"),
         label = 'all.')
 
+
 ggplot(data=subset(poolstats, sim_type %in% 'constant depth'),
-                   aes(y=total, x=pool, colour=variantcaller)) +
+       aes(y=total, x=pool, colour=variantcaller)) +
   stat_summary(fun.y=mean,geom="line",aes(group=variantcaller), size=1.5) +
+  geom_point(position='dodge', size=3, aes(shape=variantcaller)) +
   labs(x="Number of samples in pool", y="Mean variants called per pool") +
   scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 20) + theme(legend.position='none')
+  theme_classic(base_size = 20) + theme(legend.position='none') +
+  scale_y_continuous(labels = function(x) format(x, scientific = TRUE))
 ggsave(paste0(plot_prefix, 'total_variants.jpg'), height=8, width=8)
 
-# Plot real data recall over simulations
-data_subset = subset(poolstats, sim_type == 'constant depth')
-ggplot(data=data_subset, aes(x=pool, y=percent_recovered, colour = variantcaller)) + 
-  stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller), size=1.5) +
-  geom_point(size=2.5) +
-  geom_point(x=8, y=real_recall, colour='black', size=10, shape='*') +
-  annotate("text", x=8.5, y=real_recall, label=paste0(real_recall,"%"), size=5) +
-  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-  labs(x="Number of samples in pool", y="Recall %") +
-  scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 18) +
-  theme(legend.position=c(0.2, 0.15), legend.background=element_blank())
-ggsave('plots/recall_constant_plus_real.jpg', height=8, width=8)
 
-data_subset = subset(poolstats_alleles, sim_type == 'constant depth' 
-                     & nonref_allele_count_truth == 1)
-ggplot(data=data_subset, 
-       aes(x=pool, y=percent_recovered, colour = variantcaller)) + 
-  geom_point(size=2.5) + 
-  geom_point(x=8, y=real_recall_singleton, colour='black', size=10, shape='*') +
-  annotate("text", x=8.5, y=real_recall_singleton, label=paste0(real_recall_singleton,"%"), size=5) +
-  stat_summary(fun.y=mean,geom="line",aes(group=interaction(sim_type,variantcaller), 
-                                          colour=variantcaller), size=1.5) + 
-  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 20)) +
-  labs(x="Number of samples in pool", y="Recall %") +
-  scale_color_manual(values = mcriPalette("symbol")[my.colours]) +
-  theme_classic(base_size = 18) +
-  theme(legend.position='none')
-ggsave('plots/recall_singles_constant_plus_real.jpg', height=8, width=8)
+# Summary stats for paper
+library('dplyr')
+library(tidyr)
+
+poolstats %>% group_by(pool, sim_type, variantcaller) %>% 
+  summarise(mean_recall = mean(percent_recovered)) -> poolstats_mean
+poolstats_mean_wide = spread(poolstats_mean, key = pool, value = mean_recall)
+poolstats_mean_wide[,c('2','4','6','8','10')] = round(poolstats_mean_wide[,c('2','4','6','8','10')],1)
+write.csv(poolstats_mean_wide, 'simulation_mean_recall_all.csv')
+
+subset(poolstats_alleles, nonref_allele_count_truth == 1) %>% 
+  group_by(pool, sim_type, variantcaller) %>% 
+  summarise(mean_recall = mean(percent_recovered)) -> poolstats_alleles_mean
+poolstats_alleles_mean_wide = spread(poolstats_alleles_mean, key = pool, value = mean_recall)
+poolstats_alleles_mean_wide[,c('2','4','6','8','10')] = round(poolstats_alleles_mean_wide[,c('2','4','6','8','10')],1)
+write.csv(poolstats_alleles_mean_wide, 'simulation_mean_recall_single.csv')
+
+poolstats_fp %>% group_by(pool, sim_type, variantcaller) %>% 
+  summarise(mean_fp = mean(percent_fp)) -> poolstats_fp_mean
+poolstats_fp_mean_wide = spread(poolstats_fp_mean, key = pool, value = mean_fp)
+poolstats_fp_mean_wide[,c('2','4','6','8','10')] = signif(poolstats_fp_mean_wide[,c('2','4','6','8','10')],3)
+write.csv(poolstats_fp_mean_wide, 'simulation_mean_fp_all.csv')
+
+poolstats_fp %>% group_by(pool, sim_type, variantcaller) %>% 
+  summarise(mean_total = mean(total)) -> pool_totals_mean
+pool_totals_mean_wide = spread(pool_totals_mean, key = pool, value = mean_total)
+pool_totals_mean_wide[,c('2','4','6','8','10')] = round(pool_totals_mean_wide[,c('2','4','6','8','10')],0)
+write.csv(pool_totals_mean_wide, 'simulation_total_per_pool.csv')
+
+# Use the pools of 10 as the largest, so capturing most individuals
+poolstats$total_per_ind = poolstats$total/poolstats$pool
+subset(poolstats, pool == '10') %>% group_by(sim_type, variantcaller) %>% 
+  summarise(mean_total_per_ind = mean(total_per_ind)) -> poolstats_total_per_ind_mean
+poolstats_total_per_ind_mean_wide = spread(poolstats_total_per_ind_mean, key = variantcaller, value = mean_total_per_ind)
+poolstats_total_per_ind_mean_wide[,c('gatk individual','gatk joint','freebayes highqual')] = round(poolstats_total_per_ind_mean_wide[,c('gatk individual','gatk joint','freebayes highqual')],0)
+write.csv(poolstats_total_per_ind_mean_wide, 'simulation_total_per_ind_all.csv')
+
+ggplot(data= poolstats, aes(x = pool, y = total_per_ind,
+    colour = variantcaller, shape = sim_type)) +
+  geom_point()
+
+
+

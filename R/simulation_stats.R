@@ -135,19 +135,9 @@ poolstats_alleles$sim_type = factor(as.character(poolstats_alleles$sim_type), le
 poolstats_fp$sim_type = factor(as.character(poolstats_fp$sim_type), levels = sim_type_order)
 
 # Save R objects
-# save(file = 'pool_sim_data.Robj',
-#      all_data_ind_const_probands, all_data_ind_prop_probands,
-#      all_data_joint_const_probands, all_data_joint_prop_probands,
-#      poolstats_ind_const_probands_fp, poolstats_ind_prop_probands_fp,
-#      poolstats_joint_const_probands_fp, poolstats_joint_prop_probands_fp,
-#      all_data_fb_const_probands,poolstats_fb_const_probands_fp,
-#      all_data_probands
-#      )
-# load('pool_sim_data.Robj')
 save(file = 'data/simulation_summary_data.Robj', poolstats, poolstats_alleles, poolstats_fp)
-
-#for (thing in ls()) { message(thing); print(object.size(get(thing)), units='auto') }
 
 end.time <- Sys.time()
 time.taken <- end.time - start.time
+print('Total time for simulations_stats.R')
 print(time.taken)

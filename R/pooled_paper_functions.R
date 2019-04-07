@@ -148,7 +148,7 @@ extract_ind_csvs = function(data_dir, replicates, sim_type) {
       data$simulation = simulation
       data$pool = as.integer(strsplit(strsplit(f, '.', fixed = T)[[1]][2], '_')[[1]][2])
       # Calculate nonref_allele_count_truth over all probands
-      group_by(data, variant) %>% 
+      group_by(data, position) %>% 
         summarise(nonref_allele_count_truth = sum(nonref_alleles_proband, na.rm = T),
                   total_alleles_probands = sum(total_alleles_proband, na.rm = T),
                   nonref_reads_probands = sum(nonref_reads_proband, na.rm = T)
